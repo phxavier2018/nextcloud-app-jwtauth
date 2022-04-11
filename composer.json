@@ -10,9 +10,10 @@
         }
     ],
     "require": {
-        "rbdwllr/reallysimplejwt": "2.0.*"
+        		"firebase/php-jwt": "dev-add-ec-jwk-support",
+		"paragonie/sodium_compat": "^v1.17.1"
     },
     "require-dev": {
-        "phpunit/phpunit": "^5.4"
+        "phpunit/phpunit": "^7.5||9.5"
     }
 }
