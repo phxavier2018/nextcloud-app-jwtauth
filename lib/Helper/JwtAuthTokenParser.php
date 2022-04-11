@@ -2,35 +2,44 @@
 declare(strict_types=1);
 
 namespace OCA\JwtAuth\Helper;
+use Firebase\JWT\JWK;
+use Firebase\JWT\JWT;
 
 class JwtAuthTokenParser {
 
 	/**
 	 * @var string
 	 */
-	private $secret;
+	private $jwkUrl;
 
-	public function __construct(string $secret) {
-		$this->secret = $secret;
+	/**
+	* @var Psr\Log\LoggerInterface
+	*/
+	private $logger;
+
+	public function __construct(string $jwkUrl, \Psr\Log\LoggerInterface $logger) {
+		$this->jwkUrl = $jwkUrl;
+		$this->logger = $logger;
 	}
 
 	public function parseValidatedToken(string $token): ?string {
-		$parser = \ReallySimpleJWT\Token::parser($token, $this->secret);
-
 		try {
-			$parsed = $parser->validate()
-				->validateExpiration()
-				->validateNotBefore()
-				->parse();
-
-			$payload = $parsed->getPayload();
-
-			if (!array_key_exists('uid', $payload)) {
-				return null;
+			if (!isset($token)) {
+				throw new UnexpectedValueException('URL must contain a token parameter.');
 			}
-
-			return $payload['uid'];
-		} catch (\ReallySimpleJWT\Exception\ValidateException $e) {
+			$json = file_get_contents($this->jwkUrl);
+			if($json === false) {
+				throw new UnexpectedValueException('JWK URL not found.');
+			}
+			$json_data = json_decode($json, $assoc = true, $depth = 512, JSON_THROW_ON_ERROR);
+			$decoded = JWT::decode($token, JWK::parseKeySet($json_data));
+			$payload = json_decode(json_encode($decoded), $assoc = true, $depth = 512, JSON_THROW_ON_ERROR);
+			if (!array_key_exists('preferred_username', $payload)) {
+				throw new UnexpectedValueException('Payload must contain "preferred_username" key.');
+			}
+			return $payload['preferred_username'];
+		} catch (Exception $e) {
+			$this->logger->error($e);
 			return null;
 		}
 	}

@@ -117,8 +117,9 @@ class LoginPageInterceptor {
 		} else {
 			$targetPath = $targetPathSanitized;
 		}
-
-		$this->redirectToUrlAndDie($this->urlGenerator->generateAutoLoginUrl($targetPath));
+		//get header for token
+		$token = $_SERVER['HTTP_X_POMERIUM_JWT_ASSERTION'];
+		$this->redirectToUrlAndDie($this->urlGenerator->generateAutoLoginUrl($targetPath, $token));
 	}
 
 	private function redirectToUrlAndDie(string $url): void {

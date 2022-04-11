@@ -20,12 +20,12 @@ class UrlGenerator {
 		$this->logoutConfirmationUri = $logoutConfirmationUri;
 	}
 
-	public function generateAutoLoginUrl(string $targetPath): string {
+	public function generateAutoLoginUrl(string $targetPath, string $token): string {
 		return str_replace(
 			'__TARGET_PATH__',
 			urlencode($targetPath),
 			$this->autoLoginTriggerUri
-		);
+		)."&token=$token";
 	}
 
 	public function generateLogoutConfirmationUrl(): string {
