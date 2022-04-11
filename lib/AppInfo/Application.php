@@ -38,7 +38,7 @@ class Application extends App implements IBootstrap {
 		$container->registerService('loginPageInterceptor', function ($c) {
 			return new \OCA\JwtAuth\Helper\LoginPageInterceptor(
 				$c->query('urlGenerator'),
-				$c->query(\OC\User\Session::class),
+				$c->query(\OCP\IUserSession::class),
 			);
 		});
 	}

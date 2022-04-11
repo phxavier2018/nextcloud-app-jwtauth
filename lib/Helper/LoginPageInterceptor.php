@@ -17,13 +17,13 @@ class LoginPageInterceptor {
 	private $urlGenerator;
 
 	/**
-	 * @var \OC\User\Session
+	 * @var \OCP\IUserSession
 	 */
 	private $session;
 
 	public function __construct(
 		UrlGenerator $urlGenerator,
-		\OC\User\Session $session
+		\OCP\IUserSession $session
 	) {
 		$this->urlGenerator = $urlGenerator;
 		$this->session = $session;

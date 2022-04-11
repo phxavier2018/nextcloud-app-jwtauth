@@ -13,12 +13,12 @@ class LoginController extends Controller {
 	private $config;
 
 	/**
-	 * @var \OC\User\Manager
+	 * @var \OCP\IUserManager
 	 */
 	private $userManager;
 
 	/**
-	 * @var \OC\User\Session
+	 * @var \OCP\IUserSession
 	 */
 	private $session;
 
@@ -36,8 +36,8 @@ class LoginController extends Controller {
 		$AppName,
 		\OCP\IRequest $request,
 		\OCP\IConfig $config,
-		\OC\User\Session $session,
-		\OC\User\Manager $userManager,
+		\OCP\IUserSession $session,
+		\OCP\IUserManager $userManager,
 		\OCA\JwtAuth\Helper\LoginChain $loginChain,
 		\OCA\JwtAuth\Helper\JwtAuthTokenParser $jwtAuthTokenParser
 	) {
