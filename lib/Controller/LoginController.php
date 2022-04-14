@@ -32,6 +32,12 @@ class LoginController extends Controller {
 	 */
 	private $jwtAuthTokenParser;
 
+	/**
+	* @var \OCP\IGroupManager
+	*/
+	private $groupManager;
+	private $logger;
+
 	public function __construct(
 		$AppName,
 		\OCP\IRequest $request,
@@ -39,7 +45,9 @@ class LoginController extends Controller {
 		\OCP\IUserSession $session,
 		\OCP\IUserManager $userManager,
 		\OCA\JwtAuth\Helper\LoginChain $loginChain,
-		\OCA\JwtAuth\Helper\JwtAuthTokenParser $jwtAuthTokenParser
+		\OCA\JwtAuth\Helper\JwtAuthTokenParser $jwtAuthTokenParser,
+		\OCP\IGroupManager $groupManager,
+		\Psr\Log\LoggerInterface $logger
 	) {
 		parent::__construct($AppName, $request);
 
@@ -48,6 +56,8 @@ class LoginController extends Controller {
 		$this->userManager = $userManager;
 		$this->loginChain = $loginChain;
 		$this->jwtAuthTokenParser = $jwtAuthTokenParser;
+		$this->groupManager = $groupManager;
+		$this->logger = $logger;
 	}
 
 	/**
@@ -56,15 +66,8 @@ class LoginController extends Controller {
 	 * @PublicPage
 	 */
 	public function auth(string $token, string $targetPath) {
-		$username = $this->jwtAuthTokenParser->parseValidatedToken($token);
-		if ($username === null) {
-			// It could be that the JWT token has expired.
-			// Redirect to the homepage, which likely redirects to /login
-			// and starts the whole flow over again.
-			//
-			// Hopefully we have better luck next time.
-			return new RedirectResponse('/');
-		}
+		$payload = $this->jwtAuthTokenParser->parseValidatedToken($token);
+		$username = $payload['preferred_username'];
 
 		$redirectUrl = '/';
 		$targetPathParsed = parse_url($targetPath);
@@ -75,8 +78,40 @@ class LoginController extends Controller {
 		$user = $this->userManager->get($username);
 
 		if ($user === null) {
-			// This could be made friendlier.
-			die('Tried to log in with a user which does not exist.');
+			//create user
+			$userPassword = substr(base64_encode(random_bytes(64)), 0, 30);
+			$user = $this->userManager->createUser($username, $userPassword);
+			$this->config->setUserValue($username, $this->appName, 'disable_password_confirmation', 1);
+			$user->setDisplayName($payload['name']);
+			if (method_exists($user, 'setSystemEMailAddress')) {
+				$user->setSystemEMailAddress((string)$payload['email']);
+			} else {
+				$user->setEMailAddress((string)$payload['email']);
+			}
+		}
+		$claim = $this->config->getSystemConfig()->getValue('jwtauth')['GroupsClaim'];
+		if(isset($claim)) {
+			$roles = $this->config->getSystemConfig()->getValue('jwtauth')['Roles'];
+			$tokenRoles = explode(',', $payload[$claim]);
+			if(!is_array($tokenRoles)) {
+				$tokenRoles = array($payload[$claim]);
+			}
+			$groups = array_intersect($roles, $tokenRoles);
+			//remove all group of user to add after
+			$userGroups = $this->groupManager->getUserGroups($user);
+			foreach($userGroups as $uG) {
+				$uG->removeUser($user);
+			}
+			//create group if not exist, add user to group
+			foreach($groups as $value) {
+				if (!$this->groupManager->groupExists($value)) {
+					$newGroup = $this->groupManager->createGroup($value);
+					$newGroup->addUser($user);
+				} else {
+					$newGroup = $this->groupManager->get($value);
+					$newGroup->addUser($user);
+				}
+			}
 		}
 
 		if ($this->session->getUser() === $user) {
