@@ -22,7 +22,7 @@ class JwtAuthTokenParser {
 		$this->logger = $logger;
 	}
 
-	public function parseValidatedToken(string $token): ?string {
+	public function parseValidatedToken(string $token): ?array {
 		try {
 			if (!isset($token)) {
 				throw new UnexpectedValueException('URL must contain a token parameter.');
@@ -37,7 +37,7 @@ class JwtAuthTokenParser {
 			if (!array_key_exists('preferred_username', $payload)) {
 				throw new UnexpectedValueException('Payload must contain "preferred_username" key.');
 			}
-			return $payload['preferred_username'];
+			return $payload;
 		} catch (Exception $e) {
 			$this->logger->error($e);
 			return null;
