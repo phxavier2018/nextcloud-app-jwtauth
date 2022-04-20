@@ -1,6 +1,6 @@
 <?php
 return [
     'routes' => [
-	   ['name' => 'login#auth', 'url' => '/', 'verb' => 'GET'],
+	   ['name' => 'login#authJwtToken', 'url' => '/', 'verb' => 'GET'],
     ]
 ];

@@ -1,52 +1,87 @@
 <?php
+
+declare(strict_types=1);
+
 namespace OCA\JwtAuth\AppInfo;
 
+use OC\AppFramework\Utility\ControllerMethodReflector;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
+use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\IConfig;
+use OCP\IRequest;
+use OCP\ISession;
+use OCP\IURLGenerator;
+use OCP\IUserSession;
+use OCP\Util;
+use Psr\Log\LoggerInterface;
 
-class Application extends App implements IBootstrap {
+class Application extends App implements IBootstrap
+{
+    /** @var IURLGenerator */
+    protected $url;
 
-	public function __construct() {
-		parent::__construct('jwtauth');
-	}
+    /** @var Config */
+    protected $config;
+    private $appName = 'jwtauth';
 
-	public function register(IRegistrationContext $container): void {
+    public function __construct()
+    {
+        parent::__construct($this->appName);
+    }
+
+    public function register(IRegistrationContext $context): void
+    {
 		// Register the composer autoloader for packages shipped by this app, if applicable
 		include_once __DIR__ . '/../../vendor/autoload.php';
-
-		//register service
-		$container->registerService('jwtAuthTokenParser', function ($c) {
-			$config = $c->query(\OCP\IConfig::class);
-
-			return new \OCA\JwtAuth\Helper\JwtAuthTokenParser(
-				$config->getSystemConfig()->getValue('jwtauth')['JWKUrl'],
-				$config = $c->query(\Psr\Log\LoggerInterface::class),
-			);
-		});
-
-		$container->registerService('urlGenerator', function ($c) {
-			$config = $c->query(\OCP\IConfig::class);
-
-			return new \OCA\JwtAuth\Helper\UrlGenerator(
-				$config->getSystemConfig()->getValue('jwtauth')['AutoLoginTriggerUri'],
-				$config->getSystemConfig()->getValue('jwtauth')['LogoutConfirmationUri'],
-			);
-		});
-
-		$container->registerService('loginPageInterceptor', function ($c) {
-			return new \OCA\JwtAuth\Helper\LoginPageInterceptor(
-				$c->query('urlGenerator'),
-				$c->query(\OCP\IUserSession::class),
-			);
-		});
 	}
 
-	public function boot(IBootContext $context): void {
+    public function boot(IBootContext $context): void
+    {
 		$container = $context->getAppContainer();
-		$loginPageInterceptor = $container->query(\OCA\JwtAuth\Helper\LoginPageInterceptor::class);
-		$loginPageInterceptor->intercept();
-	}
+		$this->url = $container->query(IURLGenerator::class);
+		$this->config = $container->query(IConfig::class);
+		$request = $container->query(IRequest::class);
 
+		// Get logged in user's session
+		$userSession = $container->query(IUserSession::class);
+		$session = $container->query(ISession::class);
+		$logger = $container->query(LoggerInterface::class);
+
+		// Disable password confirmation for user
+		$session->set('last-password-confirm', $container->query(ITimeFactory::class)->getTime());
+
+		/* Redirect to logout URL on completing logout*/
+		$logoutUrl = $this->config->getSystemConfig()->getValue('jwtauth')['LogoutConfirmationUri'];
+		if (isset($logoutUrl)) {
+			$userSession->listen('\OC\User', 'postLogout', function () use ($logoutUrl, $session) {
+				// Do nothing if this is a CORS request
+				if ($this->getContainer()->query(ControllerMethodReflector::class)->hasAnnotation('CORS')) {
+					return;
+				}
+				// Properly close the session and clear the browsers storage data before
+				// redirecting to the logout url.
+				$session->set('clearingExecutionContexts', '1');
+				$session->close();
+				header('Clear-Site-Data: "cache", "storage"');
+				header('Location: '.$logoutUrl);
+				exit();
+			});
+		}
+		//redirect to AutoLoginTriggerUri if set
+		$autoLoginTriggerUri = $this->config->getSystemConfig()->getValue('jwtauth')['AutoLoginTriggerUri'];
+		if(isset($autoLoginTriggerUri)) {
+			if (\array_key_exists('REQUEST_METHOD', $_SERVER)
+			&& 'GET' === $_SERVER['REQUEST_METHOD']
+			&& '/login' === $request->getPathInfo()
+			&& null === $request->getParam('forceStay')
+			) {
+				$logger->debug('user access login page with the next parameters: '.json_encode($request->getParams()). 'redirecting to /aps/jwtauth');
+				header('Location: '.$autoLoginTriggerUri);
+				exit();
+			}
+		}
+	}
 }
