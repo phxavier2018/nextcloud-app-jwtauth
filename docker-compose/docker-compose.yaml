@@ -142,7 +142,7 @@ services:
           - nextcloud
     volumes:
       - nextcloud_data:/var/www/html
-      - ../jwtauth:/var/www/html/apps/jwtauth:ro
+      #- ../jwtauth:/var/www/html/apps/jwtauth:ro
       - "/etc/timezone:/etc/timezone:ro"
       - "/etc/localtime:/etc/localtime:ro"
     depends_on:
