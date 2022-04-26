@@ -54,27 +54,11 @@ $CONFIG = array (
 );
 ```
 
+## Users
+- login: phxavier@pomerium.com, password: pxaTESTpomerium1!, role: admin
+- login: pxa@pomerium.com, password: pxaTESTpomerium1!, role: member
+- login: sep@pomerium.com, password: pxaTESTpomerium1!, role: member
+
 ## Installation
 
-This JWT Auth Nextcloud application is not available on the Nextcloud [App Store](https://apps.nextcloud.com/) yet, so you **need to install it manually**.
-
-To install it, place its files in a `apps/jwtauth` directory.
-
-Then install the app's dependencies using [composer](https://getcomposer.org/): `cd apps/jwtauth; make composer; cd ..`
-
-After that, specify the required [Application configuration values](#application-configuration-values). Example:
-
-```bash
-./occ config:system:set jwtauth AutoLoginTriggerUri --value="https://your-other-system/nextcloud/auto-login?targetPath=__TARGET_PATH__"
-
-./occ config:system:set jwtauth LogoutConfirmationUri --value="https://your-other-system/nextcloud/nextcloud/logged-out"
-
-./occ config:system:set jwtauth SharedSecret --value="jJJ@wPHNNnLVLd!@__wkqLFbLd9tT!VXjkC973xMR!7cjvz4WfFgWRstH"
-```
-
-Finally, enable the app: `./occ app:enable jwtauth`.
-
-From that point on, the Nextcloud `/login` page will be unavailable.
-(A way to get to it is to access it using `/login?forceStay=1`.)
-
-All other requests to the `/login` page would be automatically captured and directed to your Identity Provider system (e.g. `https://your-other-system/nextcloud/auto-login`), before being brought back to Nextcloud.
+A docker-compose file is present, you will just launch it.

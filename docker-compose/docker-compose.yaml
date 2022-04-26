@@ -1,0 +1,156 @@
+version: "3"
+volumes:
+  postgres_data:
+  mariadb_data:
+  nextcloud_data:
+
+networks:
+  localhost.pomerium.io:
+
+services:
+  nginx:
+    # to emulate nginx-ingress behavior, use openresty which comes with 'escaped_request_uri'
+    # pre-compiled. Also uncomment lines marked `uncomment to emulate nginx-ingress behavior`
+    # in the nginx `.conf` configuration files.
+    #image: openresty/openresty
+    #image: nginx
+    build: ./openresty
+    container_name: nginx
+    networks:
+      localhost.pomerium.io:
+        aliases:
+          - authenticate.localhost.pomerium.io
+          - keycloak.localhost.pomerium.io
+          - nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./pomerium.conf:/etc/nginx/conf.d/pomerium.conf
+      - ./_wildcard.localhost.pomerium.io.pem:/etc/nginx/nginx.pem
+      - ./_wildcard.localhost.pomerium.io-key.pem:/etc/nginx/nginx-key.pem
+      - ./proxy.conf:/etc/nginx/proxy.conf
+      - ./nextcloud.conf:/etc/nginx/conf.d/nextcloud.conf
+      - ./keycloak.conf:/etc/nginx/conf.d/keycloak.conf
+      - "/etc/timezone:/etc/timezone:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+      #- ./nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf
+    depends_on:
+      - pomerium
+      - nextcloud_app
+      - keycloak
+
+
+  pomerium:
+    #image: pomerium/pomerium:debug-v0.17.0
+    build: ./pomerium
+    container_name: pomerium
+    networks:
+      localhost.pomerium.io:
+        aliases:
+          - pomerium
+    depends_on:
+      - keycloak
+    volumes:
+      - ./config.yaml:/pomerium/config.yaml:ro
+      - "/etc/timezone:/etc/timezone:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+    expose:
+      - 80
+    environment:
+      LOG_LEVEL: debug
+      POMERIUM_DEBUG: 'true'
+      PROXY_LOG_LEVEL: debug
+
+  postgres:
+    image: postgres
+    container_name: postgres
+    networks:
+      localhost.pomerium.io:
+        aliases:
+          - postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - "/etc/timezone:/etc/timezone:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: password
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:16.1.0
+    container_name: keycloak
+    networks:
+      localhost.pomerium.io:
+        aliases:
+          - keycloak
+    environment:
+      DB_VENDOR: POSTGRES
+      DB_ADDR: postgres
+      DB_DATABASE: keycloak
+      DB_USER: keycloak
+      DB_SCHEMA: public
+      DB_PASSWORD: password
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: admin
+      KEYCLOAK_IMPORT: /tmp/demo-realm.json
+      #KEYCLOAK_LOGLEVEL: ALL
+      #ROOT_LOGLEVEL: ALL
+        # Uncomment the line below if you want to specify JDBC parameters. The parameter below is just an example, and it shouldn't be used in production without knowledge. It is highly recommended that you read the PostgreSQL JDBC driver documentation in order to use it.
+        #JDBC_PARAMS: "ssl=true"
+    ports:
+      - 8080:8080
+    depends_on:
+        - postgres
+    volumes:
+      - ./keycloak/login:/opt/jboss/keycloak/themes/base/login:ro
+      - ./keycloak/realm/demo-realm.json:/tmp/demo-realm.json:ro
+      - "/etc/timezone:/etc/timezone:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+
+  nextcloud_db:
+    image: mariadb
+    container_name: nextcloud_db
+    restart: always
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW --innodb-file-per-table=1 --skip-innodb-read-only-compressed
+    networks:
+      localhost.pomerium.io:
+        aliases:
+          - mariadb
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - "/etc/timezone:/etc/timezone:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root  # Mot de passe de l'utilisateur root de mariadb
+      - MYSQL_DATABASE=nextcloud  # Nom de la base de données à créer à l'initialisation du conteneur
+      - MYSQL_USER=nextcloud  # Nom de l'utilisateur de la base de données créée
+      - MYSQL_PASSWORD=nextcloud  # Mot de passe de l'utilisateur créé
+
+  nextcloud_app:
+    #image: nextcloud
+    build: 
+      context: ..
+      dockerfile: ./docker-compose/nextcloud/Dockerfile
+    restart: always
+    container_name: nextcloud_app
+    networks:
+      localhost.pomerium.io:
+        aliases:
+          - nextcloud
+    volumes:
+      - nextcloud_data:/var/www/html
+      - ../jwtauth:/var/www/html/apps/jwtauth:ro
+      - "/etc/timezone:/etc/timezone:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+    depends_on:
+        - nextcloud_db
+    environment:
+      - MYSQL_HOST=mariadb  # Nom du conteneur de la base de données
+      - MYSQL_DATABASE=nextcloud  # Nom de la base de données
+      - MYSQL_USER=nextcloud  # Nom de l'utilisateur de la base de données
+      - MYSQL_PASSWORD=nextcloud  # Mot de passe de l'utilisateur de la base de données
+      - NEXTCLOUD_ADMIN_PASSWORD=password #admin password
+      - NEXTCLOUD_ADMIN_USER=admin # admin user

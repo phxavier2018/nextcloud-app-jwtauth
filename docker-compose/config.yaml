@@ -1,0 +1,43 @@
+# Main configuration flags : https://www.pomerium.com/docs/reference/
+
+
+pomerium_debug: true
+address: :80
+cookie_secret: YVFTMIfW8yBJw+a6sYwdW8rHbU+IAAV/SUkCTg9Jtpo=
+cookie_expire: 1h
+cookie_domain: localhost.pomerium.io
+shared_secret: 80ldlrU2d7w+wVpKNfevk6fmb8otEx6CqOfshj2LwhQ=
+signing_key: LS0tLS1CRUdJTiBFQyBQUklWQVRFIEtFWS0tLS0tCk1IY0NBUUVFSU9HYm9XT0FCSmRTRWFLbFpzMWNxRkxaSnhBZTdGQnhsVTN6cWlhT0FGaUZvQW9HQ0NxR1NNNDkKQXdFSG9VUURRZ0FFTGxKL3Fpb014VDNlak5qcTg5UEE3MEtpcDVyRFp0ckNmbDNPd2xaZnJ4bHFRVWIwT0laVQo0dXpmdDNncUZyWmZmSG05ZnBFNWQ2dUxsOWRmSkFOVTN3PT0KLS0tLS1FTkQgRUMgUFJJVkFURSBLRVktLS0tLQo=
+
+set_response_headers:
+  Content-Security-Policy: "script-src http://*.localhost.pomerium.io https://*.localhost.pomerium.io 'self' 'unsafe-inline'; style-src http://*.localhost.pomerium.io https://*.localhost.pomerium.io 'self' 'unsafe-inline';"
+  Strict-Transport-Security: '"max-age=0";'
+
+idp_provider: oidc
+idp_client_id: demoapp
+idp_client_secret: es7zLNM7qTShEeZdvu7kpGmVxhifVslg
+idp_provider_url: https://keycloak.localhost.pomerium.io/auth/realms/demo # keycloak
+idp_scopes: profile,email,openid
+
+insecure_server: true
+forward_auth_url: http://fwdauth.localhost.pomerium.io
+authenticate_service_url: https://authenticate.localhost.pomerium.io
+authorize_service_url: http://localhost:5443
+jwt_claims_headers:
+  - email
+  - groups
+  - user
+  - name
+  - preferred_username
+  - realm_roles
+  - client_roles
+
+routes:
+  - from: https://nextcloud.localhost.pomerium.io
+    to: http://nextcloud:80
+    policy:
+      - allow:
+          and:
+            - domain:
+                is: pomerium.com
+    pass_identity_headers: true
